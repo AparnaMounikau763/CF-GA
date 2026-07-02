@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  MyEC2:
+
+    Type: AWS::EC2::Instance
+
+    Properties:
+
+      InstanceType: t2.micro
+
+      ImageId: ami-xxxxxxxx
+
+      SecurityGroupIds:
+
+        - sg-xxxxxxxx
+
+      SubnetId: subnet-xxxxxxxx
