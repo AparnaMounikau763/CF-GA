@@ -1,9 +1,7 @@
 name: Deploy CloudFormation
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -20,10 +18,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Verify AWS Configuration
+      - name: Verify AWS Account
         run: |
           aws sts get-caller-identity
-          aws configure get region
+          echo "AWS_REGION=$AWS_REGION"
+          echo "AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION"
 
       - name: Validate VPC Template
         run: |
@@ -86,11 +85,13 @@ jobs:
             --output text 2>/dev/null || echo "NOT_FOUND")
 
           if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+            echo "Deleting failed EC2 stack..."
             aws cloudformation delete-stack --stack-name demo-ec2
             aws cloudformation wait stack-delete-complete --stack-name demo-ec2
           fi
 
       - name: Deploy EC2
+        id: deploy_ec2
         run: |
           aws cloudformation deploy \
             --stack-name demo-ec2 \
@@ -98,6 +99,12 @@ jobs:
             --parameter-overrides \
               VpcId=$VPC_ID \
               SubnetId=$PUBLIC_SUBNET1
+
+      - name: Show EC2 Stack Events
+        if: failure()
+        run: |
+          aws cloudformation describe-stack-events \
+            --stack-name demo-ec2 || true
 
       - name: Get EC2 Output
         run: |
