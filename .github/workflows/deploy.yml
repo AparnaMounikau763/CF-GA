@@ -1,0 +1,166 @@
+name: Deploy CloudFormation Infrastructure
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: dev
+
+jobs:
+
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      #########################################################
+      # Validate Templates
+      #########################################################
+
+      - name: Validate VPC
+        run: |
+          aws cloudformation validate-template \
+          --template-body file://templates/vpc.yaml
+
+      - name: Validate EC2
+        run: |
+          aws cloudformation validate-template \
+          --template-body file://templates/ec2.yaml
+
+      - name: Validate ALB
+        run: |
+          aws cloudformation validate-template \
+          --template-body file://templates/alb.yaml
+
+      - name: Validate RDS
+        run: |
+          aws cloudformation validate-template \
+          --template-body file://templates/rds.yaml
+
+      #########################################################
+      # Deploy VPC
+      #########################################################
+
+      - name: Deploy VPC
+        run: |
+
+          aws cloudformation deploy \
+          --stack-name demo-vpc \
+          --template-file templates/vpc.yaml \
+          --capabilities CAPABILITY_NAMED_IAM
+
+      #########################################################
+      # Get Outputs
+      #########################################################
+
+      - name: Read Stack Outputs
+        id: outputs
+        run: |
+
+          echo "VPC_ID=$(aws cloudformation describe-stacks \
+          --stack-name demo-vpc \
+          --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+          echo "PUBLIC_SUBNET1=$(aws cloudformation describe-stacks \
+          --stack-name demo-vpc \
+          --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet1'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+          echo "PUBLIC_SUBNET2=$(aws cloudformation describe-stacks \
+          --stack-name demo-vpc \
+          --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet2'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+          echo "PRIVATE_SUBNET1=$(aws cloudformation describe-stacks \
+          --stack-name demo-vpc \
+          --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+          echo "PRIVATE_SUBNET2=$(aws cloudformation describe-stacks \
+          --stack-name demo-vpc \
+          --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+      #########################################################
+      # Deploy EC2
+      #########################################################
+
+      - name: Deploy EC2
+        run: |
+
+          aws cloudformation deploy \
+          --stack-name demo-ec2 \
+          --template-file templates/ec2.yaml \
+          --parameter-overrides \
+          VpcId=$VPC_ID \
+          SubnetId=$PUBLIC_SUBNET1
+
+      #########################################################
+      # Get EC2 ID
+      #########################################################
+
+      - name: Get EC2 Instance ID
+        run: |
+
+          echo "EC2_ID=$(aws cloudformation describe-stacks \
+          --stack-name demo-ec2 \
+          --query "Stacks[0].Outputs[?OutputKey=='EC2Id'].OutputValue" \
+          --output text)" >> $GITHUB_ENV
+
+      #########################################################
+      # Deploy ALB
+      #########################################################
+
+      - name: Deploy ALB
+        run: |
+
+          aws cloudformation deploy \
+          --stack-name demo-alb \
+          --template-file templates/alb.yaml \
+          --parameter-overrides \
+          VpcId=$VPC_ID \
+          PublicSubnet1=$PUBLIC_SUBNET1 \
+          PublicSubnet2=$PUBLIC_SUBNET2 \
+          EC2Id=$EC2_ID
+
+      #########################################################
+      # Deploy RDS
+      #########################################################
+
+      - name: Deploy RDS
+        run: |
+
+          aws cloudformation deploy \
+          --stack-name demo-rds \
+          --template-file templates/rds.yaml \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --parameter-overrides \
+          VpcId=$VPC_ID \
+          PrivateSubnet1=$PRIVATE_SUBNET1 \
+          PrivateSubnet2=$PRIVATE_SUBNET2
+
+      #########################################################
+      # Display Outputs
+      #########################################################
+
+      - name: Display Outputs
+        run: |
+
+          aws cloudformation describe-stacks \
+          --stack-name demo-alb
+
+          aws cloudformation describe-stacks \
+          --stack-name demo-rds

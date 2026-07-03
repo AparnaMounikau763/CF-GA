@@ -1,6 +1,36 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
+Parameters:
+
+  VpcId:
+    Type: String
+
+  SubnetId:
+    Type: String
+
 Resources:
+
+  EC2SecurityGroup:
+
+    Type: AWS::EC2::SecurityGroup
+
+    Properties:
+
+      GroupDescription: EC2 Security Group
+
+      VpcId: !Ref VpcId
+
+      SecurityGroupIngress:
+
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
 
   MyEC2:
 
@@ -14,6 +44,18 @@ Resources:
 
       SecurityGroupIds:
 
-        - sg-xxxxxxxx
+        - !Ref EC2SecurityGroup
 
-      SubnetId: subnet-xxxxxxxx
+      SubnetId: !Ref SubnetId
+
+      Tags:
+
+        - Key: Name
+
+          Value: Demo-EC2
+
+Outputs:
+
+  EC2Id:
+
+    Value: !Ref MyEC2
