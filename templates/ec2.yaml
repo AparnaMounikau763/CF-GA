@@ -8,20 +8,19 @@ Parameters:
   SubnetId:
     Type: String
 
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
 Resources:
 
   EC2SecurityGroup:
-
     Type: AWS::EC2::SecurityGroup
-
     Properties:
-
       GroupDescription: EC2 Security Group
-
       VpcId: !Ref VpcId
 
       SecurityGroupIngress:
-
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
@@ -33,29 +32,23 @@ Resources:
           CidrIp: 0.0.0.0/0
 
   MyEC2:
-
     Type: AWS::EC2::Instance
-
     Properties:
 
       InstanceType: t2.micro
 
-      ImageId: ami-xxxxxxxx
+      ImageId: !Ref LatestAmiId
 
       SecurityGroupIds:
-
         - !Ref EC2SecurityGroup
 
       SubnetId: !Ref SubnetId
 
       Tags:
-
         - Key: Name
-
           Value: Demo-EC2
 
 Outputs:
 
   EC2Id:
-
     Value: !Ref MyEC2
